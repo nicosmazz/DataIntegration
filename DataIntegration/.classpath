@@ -5,7 +5,6 @@
 	<classpathentry kind="lib" path="lib/json-simple-1.1.jar"/>
 	<classpathentry kind="lib" path="lib/java-json.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Jena Lib"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JxBrowser"/>
 	<classpathentry kind="lib" path="/Users/NicoMac/Documents/Programmazione/WorkspaceOxygen/apache-jena-3.8.0/lib/collection-0.7.jar"/>
 	<classpathentry kind="lib" path="/Users/NicoMac/Documents/Programmazione/WorkspaceOxygen/apache-jena-3.8.0/lib/commons-cli-1.4.jar"/>
 	<classpathentry kind="lib" path="/Users/NicoMac/Documents/Programmazione/WorkspaceOxygen/apache-jena-3.8.0/lib/commons-codec-1.11.jar"/>
