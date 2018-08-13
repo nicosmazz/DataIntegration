@@ -18,6 +18,7 @@ public class DataIntegrationPanel extends JPanel {
 	private JTextField txtUrl;
 	private JTextField txtUrl2;
 	private JScrollPane scrollPane;
+	private JButton btnPulisci;
 	
 	public DataIntegrationPanel() {
 		setLayout(new BorderLayout(0, 0));
@@ -62,14 +63,21 @@ public class DataIntegrationPanel extends JPanel {
 		panelBox.setLayout(new BoxLayout(panelBox, BoxLayout.Y_AXIS));
 				
 		JPanel panelSouth = new JPanel();
-		FlowLayout flowLayout_2 = (FlowLayout) panelSouth.getLayout();
-		flowLayout_2.setAlignment(FlowLayout.LEFT);
 		add(panelSouth, BorderLayout.SOUTH);
+		panelSouth.setLayout(new BoxLayout(panelSouth, BoxLayout.X_AXIS));
 		
 		btnCerca = new JButton("Cerca ");
 		panelSouth.add(btnCerca);
+		
+		btnPulisci = new JButton("Pulisci");
+		btnPulisci.setEnabled(false);
+		panelSouth.add(btnPulisci);
 	}
 	
+	public JButton getBtnPulisci() {
+		return btnPulisci;
+	}
+
 	public JPanel getPanelBox() {
 		return panelBox;
 	}
