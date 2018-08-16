@@ -17,7 +17,6 @@ import javax.swing.JTextArea;
 import javax.swing.WindowConstants;
 
 import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.NodeIterator;
 import org.apache.jena.rdf.model.Property;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.Resource;
@@ -261,9 +260,16 @@ public class DataIntegrationController {
 	private void ricercaInProfondità() {
 		boolean match = false;
 
-		// Prendo tutti gli object del primo modello
-		NodeIterator iter = modelFirstUri.listObjects();
-		ArrayList<RDFNode> resources = (ArrayList<RDFNode>) iter.toList();
+		// Prendo tutti gli object del primo modello, che poi espanderò
+		ArrayList<RDFNode> resources = (ArrayList<RDFNode>) modelFirstUri.listObjects().toList();
+		//estraggo tutti i subjects dal modello, che poi espanderò
+		ArrayList<Resource> subjects = (ArrayList<Resource>) modelFirstUri.listSubjects().toList();
+		//per ogni subjects estratto, faccio il cast in RDFNode e lo inserisco all'iterno del ArrayList
+		for(int i=0;i<subjects.size();i++) {
+			RDFNode nodeX = (RDFNode) subjects.get(i);
+			resources.add(nodeX);
+		}
+		
 		/*
 		 * itero sulla lista di Objects estratti per e di volta in volta definisco un
 		 * nuovo modello contenente tutte le triple che hanno come subject o object
@@ -297,8 +303,12 @@ public class DataIntegrationController {
 			// se non sono stati trovati match espando una sola volta gli object del modello
 			// creato sopra
 			if (!match) {
-				NodeIterator iter2 = newModel.listObjects();
-				ArrayList<RDFNode> resources2 = (ArrayList<RDFNode>) iter2.toList();
+				ArrayList<RDFNode> resources2 = (ArrayList<RDFNode>) newModel.listObjects().toList();
+				ArrayList<Resource> subjects2 = (ArrayList<Resource>) newModel.listSubjects().toList();
+				for(int ii=0;ii<subjects2.size();ii++) {
+					RDFNode nodeX = (RDFNode) subjects2.get(ii);
+					resources2.add(nodeX);
+				}
 				for (int j = 0; j < resources2.size(); j++) {
 					RDFNode node2 = resources.get(i);
 					/*
