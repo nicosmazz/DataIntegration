@@ -2,6 +2,8 @@ package it.dataIntegration.view;
 
 import javax.swing.JPanel;
 import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+
 import java.awt.BorderLayout;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
@@ -10,6 +12,7 @@ import java.awt.FlowLayout;
 import javax.swing.JScrollPane;
 import javax.swing.JButton;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.JRadioButton;
 
 @SuppressWarnings("serial")
 public class DataIntegrationPanel extends JPanel {
@@ -19,6 +22,9 @@ public class DataIntegrationPanel extends JPanel {
 	private JTextField txtUrl2;
 	private JScrollPane scrollPane;
 	private JButton btnPulisci;
+	private JPanel panelNorth3;
+	private JRadioButton rdbtnProfondità;
+	private JRadioButton rdbtnAmpiezza;
 	
 	public DataIntegrationPanel() {
 		setLayout(new BorderLayout(0, 0));
@@ -54,6 +60,21 @@ public class DataIntegrationPanel extends JPanel {
 		panelNorth2.add(txtUrl2);
 		txtUrl2.setColumns(70);
 		
+		panelNorth3 = new JPanel();
+		FlowLayout flowLayout_2 = (FlowLayout) panelNorth3.getLayout();
+		flowLayout_2.setAlignment(FlowLayout.LEFT);
+		panelNorth.add(panelNorth3);
+		
+		rdbtnProfondità = new JRadioButton("Ricerca in profodità");
+		rdbtnProfondità.setSelected(true);
+		panelNorth3.add(rdbtnProfondità);
+		
+		rdbtnAmpiezza = new JRadioButton("Ricerca in ampiezza");
+		panelNorth3.add(rdbtnAmpiezza);
+		
+		ButtonGroup group = new ButtonGroup();
+	    group.add(rdbtnProfondità);
+	    group.add(rdbtnAmpiezza);
 		
 		scrollPane = new JScrollPane();
 		add(scrollPane, BorderLayout.CENTER);
@@ -74,6 +95,14 @@ public class DataIntegrationPanel extends JPanel {
 		panelSouth.add(btnPulisci);
 	}
 	
+	public JRadioButton getRdbtnProfondità() {
+		return rdbtnProfondità;
+	}
+
+	public JRadioButton getRdbtnAmpiezza() {
+		return rdbtnAmpiezza;
+	}
+
 	public JButton getBtnPulisci() {
 		return btnPulisci;
 	}

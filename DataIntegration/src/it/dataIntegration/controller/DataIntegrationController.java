@@ -2,7 +2,6 @@ package it.dataIntegration.controller;
 
 import java.awt.Font;
 import java.awt.Frame;
-import java.awt.List;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedWriter;
@@ -27,7 +26,7 @@ import org.apache.jena.rdf.model.StmtIterator;
 
 import it.dataIntegration.model.DbpediaObject;
 import it.dataIntegration.model.Path;
-import it.dataIntegration.model.CustomObject;
+import it.dataIntegration.model.ExpandedNode;
 import it.dataIntegration.utility.ProcessCpuLoad;
 import it.dataIntegration.utility.RestServices;
 import it.dataIntegration.utility.SparqlQuery;
@@ -39,13 +38,6 @@ public class DataIntegrationController {
 	private Model modelFirstUri;
 	private Model modelFirstUriModified;
 	private Model modelSecondUri;
-	
-	private Model modelUriNumberOne;
-	private Model modelUriNumberOneModified;
-	private Model modelUriNumberTwo;
-	private RDFNode objectNumberOne = null;
-	private RDFNode objectNumberTwo = null;
-	
 	private int iteration = 1;
 	private DataIntegrationPanel view;
 	private ArrayList<RDFNode> matches = new ArrayList<RDFNode>();
@@ -61,38 +53,38 @@ public class DataIntegrationController {
 
 		// creo il file di log
 		try {
-		  File file =new File("log.txt");
-	    	  if(!file.exists()){
-	    	 	file.createNewFile();
-	    	  }
-	    	  FileWriter fw = new FileWriter(file,true);
-	    	  BufferedWriter bw = new BufferedWriter(fw);
-	    	  writer = new PrintWriter(bw);
+			File file = new File("log.txt");
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+			FileWriter fw = new FileWriter(file, true);
+			BufferedWriter bw = new BufferedWriter(fw);
+			writer = new PrintWriter(bw);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		/*
-		 * Thread utilizzato in fase di test per comparare le prestazioni della ricerca
-		 * in profondità e della ricerca in ampienza
-		 */
-		Thread thread = new Thread(new Runnable() {
-			public void run() {
-				while (monitorThread) {
-					try {
-						ProcessCpuLoad.getProcessCpuLoad();
-						Thread.sleep(500);
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-				}
-			}
-
-		});
-		thread.start();
 
 		view.getBtnCerca().addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
+				/*
+				 * Thread utilizzato in fase di test per comparare le prestazioni della ricerca
+				 * in profondità e della ricerca in ampienza
+				 */
+				Thread threadCpuLoad = new Thread(new Runnable() {
+					public void run() {
+						while (monitorThread) {
+							try {
+								ProcessCpuLoad.getProcessCpuLoad();
+								Thread.sleep(500);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					}
+
+				});
+				threadCpuLoad.start();
 				view.getBtnCerca().setEnabled(false);
 				view.getBtnPulisci().setEnabled(true);
 				JDialog dialog = new JDialog(frame, "Please Wait...", true);
@@ -122,25 +114,23 @@ public class DataIntegrationController {
 						// cerco tutte le triple che hanno come soggetto/oggetto i vari uri estratti
 						// dalla prima notizia
 						modelFirstUri = SparqlQuery.QuerySparql(list);
-						modelFirstUriModified = modelFirstUri;					
+						modelFirstUriModified = modelFirstUri;
 						// cerco tutte le triple che hanno come soggetto/oggetto i vari uri estratti
 						// dalla seconda notizia
 						modelSecondUri = SparqlQuery.QuerySparql(list2);
 						// faccio un check sui due modelli ottenuti al fine di constatare un'eventuale
 						// intersezione
-						
-						/*Modello da memorizzare*/
-						modelUriNumberOne = modelFirstUri;
-						modelUriNumberOneModified=modelUriNumberOne;
-						modelUriNumberTwo = modelSecondUri;
-						/*Fine*/
 
 						writer.println("Iterazione n° " + iteration + ":");
 						writer.println();
 						boolean match = searchMatch();
 						writeResult(match);
 						if (!match) {
-							ricercaInAmpiezza();
+							if (view.getRdbtnProfondità().isSelected()) {
+								ricercaInProfondita();
+							} else {
+								ricercaInAmpiezza();
+							}
 						}
 						dialog.dispose();
 						writer.close();
@@ -150,21 +140,20 @@ public class DataIntegrationController {
 				dialog.setVisible(true);
 			}
 		});
-	
+
 		view.getBtnPulisci().addActionListener(new ActionListener() {
-			
+
 			public void actionPerformed(ActionEvent e) {
 				view.getBtnPulisci().setEnabled(false);
 				view.getPanelBox().removeAll();
 				view.getPanelBox().revalidate();
-				view.getTxtUrl().setText("");
-				view.getTxtUrl2().setText("");
 				view.getBtnCerca().setEnabled(true);
 				iteration = 1;
 				monitorThread = true;
 				firstObject = null;
 				secondObject = null;
 				matches.clear();
+				ProcessCpuLoad.clearArrayList();
 			}
 		});
 	}
@@ -274,118 +263,23 @@ public class DataIntegrationController {
 	 */
 	private void ricercaInProfondita() {
 		boolean match = false;
-
+		/*
+		 * definisco un array list che userò per memorizzare tutti i nodi espansi,
+		 * cosicchè da evitare di espandere due volte lo stesso nodo
+		 */
+		ArrayList<String> nodeAlreadyExpanded = new ArrayList<String>();
+		
 		// Prendo tutti gli object del primo modello, che poi espanderò
 		ArrayList<RDFNode> resources = (ArrayList<RDFNode>) modelFirstUri.listObjects().toList();
-		//estraggo tutti i subjects dal modello, che poi espanderò
+		// estraggo tutti i subjects dal modello, che poi espanderò
 		ArrayList<Resource> subjects = (ArrayList<Resource>) modelFirstUri.listSubjects().toList();
-		//per ogni subjects estratto, faccio il cast in RDFNode e lo inserisco all'iterno del ArrayList
-		for(int i=0;i<subjects.size();i++) {
+		// per ogni subjects estratto, faccio il cast in RDFNode e lo inserisco
+		// all'iterno del ArrayList
+		for (int i = 0; i < subjects.size(); i++) {
 			RDFNode nodeX = (RDFNode) subjects.get(i);
 			resources.add(nodeX);
 		}
-		
-		/*
-		 * itero sulla lista di Objects estratti per e di volta in volta definisco un
-		 * nuovo modello contenente tutte le triple che hanno come subject o object
-		 * l'object della lista
-		 */
-		for (int i = 0; i < resources.size(); i++) {
-			RDFNode node = resources.get(i);
-			// vado a scrive l'uri del nodo che sto espandendo nel log
-			writeLog(null, null, false, node.toString());
 
-			/*
-			 * la variabile globale fistObject memorizza il nodo che sto espandendo sarà poi
-			 * utile per ricostruire il path dell'eventuale match trovato
-			 */
-			firstObject = node;
-			Model newModel;
-			if (node.isLiteral()) {
-				newModel = SparqlQuery.QuerySparql(node.toString(), true);
-			} else {
-				newModel = SparqlQuery.QuerySparql(node.toString(), false);
-			}
-			// vado ad aggiornare la dimensione del grafo
-			modelFirstUriModified = modelFirstUriModified.union(newModel);
-			/*
-			 * a questo punto sovrascrivo il precendente modello con l'attuale per poi
-			 * verificare se sono presenti dei match con i nuovi subject e object estratti
-			 */
-			modelFirstUri = newModel;
-			match = searchMatch();
-			writeResult(match);
-			// se non sono stati trovati match espando una sola volta gli object del modello
-			// creato sopra
-			if (!match) {
-				ArrayList<RDFNode> resources2 = (ArrayList<RDFNode>) newModel.listObjects().toList();
-				ArrayList<Resource> subjects2 = (ArrayList<Resource>) newModel.listSubjects().toList();
-				for(int ii=0;ii<subjects2.size();ii++) {
-					RDFNode nodeX = (RDFNode) subjects2.get(ii);
-					resources2.add(nodeX);
-				}
-				for (int j = 0; j < resources2.size(); j++) {
-					RDFNode node2 = resources.get(i);
-					/*
-					 * la variabile globale secondObject memorizza il sotto-nodo(rispetto al nodo
-					 * firstObject) che sto espandendo sarà poi utile per ricostruire il path
-					 * dell'eventuale match trovato
-					 */
-					secondObject = node2;
-					// vado a scrive l'uri del nodo che sto espandendo nel log
-					writeLog(null, null, false, node2.toString());
-					Model newModel2;
-					if (node2.isLiteral()) {
-						// devo cercare tutte le triple cha hanno node come uri
-						newModel2 = SparqlQuery.QuerySparql(node2.toString(), true);
-					} else {
-						// devo cercare tutte le triple cha hanno node come uri
-						newModel2 = SparqlQuery.QuerySparql(node2.toString(), false);
-					}
-					// vado ad aggiornare la dimensione del grafo
-					modelFirstUriModified = modelFirstUriModified.union(newModel2);
-					// quindi cerco di nuovi dei match
-					modelFirstUri = newModel2;
-					match = searchMatch();
-					writeResult(match);
-					if (match) {
-						// se trovo un match interrompo l'iterazione
-						break;
-					}
-				}
-				secondObject = null;
-			}
-			// se trovo un match interrompo l'iterazione
-			if (match) {
-				break;
-			}
-			/*
-			 * Giunti qui, se non si è trovato alcun match si prosegue espandendo gli Object
-			 * estratti inizialmente (quelli del primo ciclo for)
-			 */
-			
-		}
-	}
-	
-	
-	/*Inizio metodo nuovo*/
-	
-	private void ricercaInAmpiezza() {
-		boolean match = false;
-
-		// Prendo tutti gli object del primo modello, che poi espander�
-		ArrayList<RDFNode> resources = (ArrayList<RDFNode>) modelUriNumberOne.listObjects().toList();
-		//estraggo tutti i subjects dal modello, che poi espander�
-		ArrayList<Resource> subjects = (ArrayList<Resource>) modelUriNumberOne.listSubjects().toList();
-		
-		ArrayList<CustomObject> listRDFNodeModel = new ArrayList<CustomObject>();
-		
-		//per ogni subjects estratto, faccio il cast in RDFNode e lo inserisco all'iterno del ArrayList
-		for(int i=0;i<subjects.size();i++) {
-			RDFNode nodeX = (RDFNode) subjects.get(i);
-			resources.add(nodeX);
-		}
-		
 		/*
 		 * itero sulla lista di Objects estratti per e di volta in volta definisco un
 		 * nuovo modello contenente tutte le triple che hanno come subject o object
@@ -394,80 +288,200 @@ public class DataIntegrationController {
 		
 		for (int i = 0; i < resources.size(); i++) {
 			RDFNode node = resources.get(i);
-			// vado a scrive l'uri del nodo che sto espandendo nel log
-			writeLog(null, null, false, node.toString());
+			if (!nodeAlreadyExpanded.contains(node.toString())) {
+				nodeAlreadyExpanded.add(node.toString());
+				// vado a scrive l'uri del nodo che sto espandendo nel log
+				writeLog(null, null, false, node.toString());
 
-			/*
-			 * la variabile globale fistObject memorizza il nodo che sto espandendo sarà poi
-			 * utile per ricostruire il path dell'eventuale match trovato
-			 */
-			objectNumberOne = node;
-			Model newModel;
-			if (node.isLiteral()) {
-				newModel = SparqlQuery.QuerySparql(node.toString(), true);
-			} else {
-				newModel = SparqlQuery.QuerySparql(node.toString(), false);
-			}
-			// vado ad aggiornare la dimensione del grafo
-			modelUriNumberOneModified = modelUriNumberOneModified.union(newModel);
-			/*
-			 * a questo punto sovrascrivo il precendente modello con l'attuale per poi
-			 * verificare se sono presenti dei match con i nuovi subject e object estratti
-			 */
-			modelUriNumberOne = newModel;			
-			CustomObject object1 = new CustomObject(node, modelUriNumberOne);
-			listRDFNodeModel.add(object1);
-			
-			match = searchMatch();
-			writeResult(match);
-			if (match) {
-				break;
-			}
-		}
-		
-		
-		// se non sono stati trovati match espando una sola volta gli object del modello
-		// creato sopra
-		if (!match) {
-			for (int i = 0; i < listRDFNodeModel.size(); i++) {
+				/*
+				 * la variabile globale fistObject memorizza il nodo che sto espandendo sarà poi
+				 * utile per ricostruire il path dell'eventuale match trovato
+				 */
+				firstObject = node;
+				Model newModel;
+				if (node.isLiteral()) {
+					newModel = SparqlQuery.QuerySparql(node.toString(), true);
+				} else {
+					newModel = SparqlQuery.QuerySparql(node.toString(), false);
+				}
+				// vado ad aggiornare la dimensione del grafo
+				modelFirstUriModified = modelFirstUriModified.union(newModel);
+				/*
+				 * a questo punto sovrascrivo il precendente modello con l'attuale per poi
+				 * verificare se sono presenti dei match con i nuovi subject e object estratti
+				 */
+				modelFirstUri = newModel;
+				match = searchMatch();
+				writeResult(match);
+				// se non sono stati trovati match espando una sola volta gli object del modello
+				// creato sopra
 				if (!match) {
-					Model modelListRDFNodeModel = listRDFNodeModel.get(i).getModel();
-					ArrayList<RDFNode> resources2 = (ArrayList<RDFNode>) modelListRDFNodeModel.listObjects().toList();
-					ArrayList<Resource> subjects2 = (ArrayList<Resource>) modelListRDFNodeModel.listSubjects().toList();
-					for(int ii=0;ii<subjects2.size();ii++) {
+					ArrayList<RDFNode> resources2 = (ArrayList<RDFNode>) newModel.listObjects().toList();
+					ArrayList<Resource> subjects2 = (ArrayList<Resource>) newModel.listSubjects().toList();
+					for (int ii = 0; ii < subjects2.size(); ii++) {
 						RDFNode nodeX = (RDFNode) subjects2.get(ii);
 						resources2.add(nodeX);
 					}
 					for (int j = 0; j < resources2.size(); j++) {
-						RDFNode node2 = resources.get(i);
-						/*
-						 * la variabile globale secondObject memorizza il sotto-nodo(rispetto al nodo
-						 * firstObject) che sto espandendo sarà poi utile per ricostruire il path
-						 * dell'eventuale match trovato
-						 */
-						objectNumberTwo = node2;
-						// vado a scrive l'uri del nodo che sto espandendo nel log
-						writeLog(null, null, false, node2.toString());
-						Model newModel2;
-						if (node2.isLiteral()) {
-							// devo cercare tutte le triple cha hanno node come uri
-							newModel2 = SparqlQuery.QuerySparql(node2.toString(), true);
-						} else {
-							// devo cercare tutte le triple cha hanno node come uri
-							newModel2 = SparqlQuery.QuerySparql(node2.toString(), false);
-						}
-						// vado ad aggiornare la dimensione del grafo
-						modelUriNumberOneModified = modelUriNumberOneModified.union(newModel2);
-						// quindi cerco di nuovi dei match
-						modelUriNumberOne = newModel2;
-						match = searchMatch();
-						writeResult(match);
-						if (match) {
-							// se trovo un match interrompo l'iterazione
-							break;
+						RDFNode node2 = resources2.get(j);
+						if (!nodeAlreadyExpanded.contains(node2.toString())) {
+							nodeAlreadyExpanded.add(node2.toString());
+							/*
+							 * la variabile globale secondObject memorizza il sotto-nodo(rispetto al nodo
+							 * firstObject) che sto espandendo sarà poi utile per ricostruire il path
+							 * dell'eventuale match trovato
+							 */
+							secondObject = node2;
+							// vado a scrive l'uri del nodo che sto espandendo nel log
+							writeLog(null, null, false, node2.toString());
+							Model newModel2;
+							if (node2.isLiteral()) {
+								// devo cercare tutte le triple cha hanno node come uri
+								newModel2 = SparqlQuery.QuerySparql(node2.toString(), true);
+							} else {
+								// devo cercare tutte le triple cha hanno node come uri
+								newModel2 = SparqlQuery.QuerySparql(node2.toString(), false);
+							}
+							// vado ad aggiornare la dimensione del grafo
+							modelFirstUriModified = modelFirstUriModified.union(newModel2);
+							// quindi cerco di nuovi dei match
+							modelFirstUri = newModel2;
+							match = searchMatch();
+							writeResult(match);
+							if (match) {
+								// se trovo un match interrompo l'iterazione
+								break;
+							}
 						}
 					}
-					objectNumberTwo = null;
+					secondObject = null;
+				}
+				// se trovo un match interrompo l'iterazione
+				if (match) {
+					break;
+				}
+				/*
+				 * Giunti qui, se non si è trovato alcun match si prosegue espandendo gli Object
+				 * estratti inizialmente (quelli del primo ciclo for)
+				 */
+			}
+		}
+	}
+
+	/* Inizio metodo nuovo */
+
+	private void ricercaInAmpiezza() {
+		boolean match = false;
+		/*
+		 * definisco un array list che userò per memorizzare tutti i nodi espansi,
+		 * cosicchè da evitare di espandere due volte lo stesso nodo
+		 */
+		ArrayList<String> nodeAlreadyExpanded = new ArrayList<String>();
+
+		// Prendo tutti gli object del primo modello, che poi espander�
+		ArrayList<RDFNode> resources = (ArrayList<RDFNode>) modelFirstUri.listObjects().toList();
+		// estraggo tutti i subjects dal modello, che poi espander�
+		ArrayList<Resource> subjects = (ArrayList<Resource>) modelFirstUri.listSubjects().toList();
+
+		ArrayList<ExpandedNode> expandedNodes = new ArrayList<ExpandedNode>();
+
+		// per ogni subjects estratto, faccio il cast in RDFNode e lo inserisco
+		// all'iterno del ArrayList
+		for (int i = 0; i < subjects.size(); i++) {
+			RDFNode nodeX = (RDFNode) subjects.get(i);
+			resources.add(nodeX);
+		}
+
+		/*
+		 * itero sulla lista di Objects estratti per e di volta in volta definisco un
+		 * nuovo modello contenente tutte le triple che hanno come subject o object
+		 * l'object della lista
+		 */
+
+		for (int i = 0; i < resources.size(); i++) {
+			RDFNode node = resources.get(i);
+			if (!nodeAlreadyExpanded.contains(node.toString())) {
+				nodeAlreadyExpanded.add(node.toString());
+				// vado a scrive l'uri del nodo che sto espandendo nel log
+				writeLog(null, null, false, node.toString());
+
+				/*
+				 * la variabile globale fistObject memorizza il nodo che sto espandendo sarà poi
+				 * utile per ricostruire il path dell'eventuale match trovato
+				 */
+				firstObject = node;
+				Model newModel;
+				if (node.isLiteral()) {
+					newModel = SparqlQuery.QuerySparql(node.toString(), true);
+				} else {
+					newModel = SparqlQuery.QuerySparql(node.toString(), false);
+				}
+				// vado ad aggiornare la dimensione del grafo
+				modelFirstUriModified = modelFirstUriModified.union(newModel);
+				/*
+				 * a questo punto sovrascrivo il precendente modello con l'attuale per poi
+				 * verificare se sono presenti dei match con i nuovi subject e object estratti
+				 */
+				modelFirstUri = newModel;
+				ExpandedNode object1 = new ExpandedNode(node, modelFirstUri);
+				expandedNodes.add(object1);
+
+				match = searchMatch();
+				writeResult(match);
+				if (match) {
+					break;
+				}
+			}
+		}
+
+		/*
+		 * se non trovo alcun match nel ciclo precedente proseguo espandendo una volta
+		 * ogni nodo contenuto nei modelli salvati all'interno della lista
+		 * expandedNodes. Quindi scendo in profondità nel mio grafo
+		 */
+		if (!match) {
+			for (int i = 0; i < expandedNodes.size(); i++) {
+				if (!match) {
+					Model modelListRDFNodeModel = expandedNodes.get(i).getModel();
+					ArrayList<RDFNode> resources2 = (ArrayList<RDFNode>) modelListRDFNodeModel.listObjects().toList();
+					ArrayList<Resource> subjects2 = (ArrayList<Resource>) modelListRDFNodeModel.listSubjects().toList();
+					for (int ii = 0; ii < subjects2.size(); ii++) {
+						RDFNode nodeX = (RDFNode) subjects2.get(ii);
+						resources2.add(nodeX);
+					}
+					for (int j = 0; j < resources2.size(); j++) {
+						RDFNode node2 = resources2.get(j);
+						if (!nodeAlreadyExpanded.contains(node2.toString())) {
+							nodeAlreadyExpanded.add(node2.toString());
+							/*
+							 * la variabile globale secondObject memorizza il sotto-nodo(rispetto al nodo
+							 * firstObject) che sto espandendo sarà poi utile per ricostruire il path
+							 * dell'eventuale match trovato
+							 */
+							secondObject = node2;
+							// vado a scrive l'uri del nodo che sto espandendo nel log
+							writeLog(null, null, false, node2.toString());
+							Model newModel2;
+							if (node2.isLiteral()) {
+								// devo cercare tutte le triple cha hanno node come uri
+								newModel2 = SparqlQuery.QuerySparql(node2.toString(), true);
+							} else {
+								// devo cercare tutte le triple cha hanno node come uri
+								newModel2 = SparqlQuery.QuerySparql(node2.toString(), false);
+							}
+							// vado ad aggiornare la dimensione del grafo
+							modelFirstUriModified = modelFirstUriModified.union(newModel2);
+							// quindi cerco di nuovi dei match
+							modelFirstUri = newModel2;
+							match = searchMatch();
+							writeResult(match);
+							if (match) {
+								// se trovo un match interrompo l'iterazione
+								break;
+							}
+						}
+					}
+					secondObject = null;
 				}
 				if (match) {
 					break;
@@ -475,13 +489,6 @@ public class DataIntegrationController {
 			}
 		}
 	}
-			
-	
-	/*Fine metodo nuovo*/
-	
-	
-	
-	
 
 	/*
 	 * Questo metodo mostra a schermo eventuali match trovati durante le varie

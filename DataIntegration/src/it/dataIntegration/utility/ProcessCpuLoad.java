@@ -47,4 +47,8 @@ public class ProcessCpuLoad {
 	      }
 	    return  Math.floor((sum / cpuLoads.size()) * 100) / 100;
 	  }
+	
+	public static void clearArrayList() {
+		cpuLoads.clear();
+	}
 }
