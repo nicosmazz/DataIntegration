@@ -22,9 +22,13 @@ public class DataIntegrationPanel extends JPanel {
 	private JTextField txtUrl2;
 	private JScrollPane scrollPane;
 	private JButton btnPulisci;
-	private JPanel panelNorth3;
+	private JPanel panelNorth4;
 	private JRadioButton rdbtnProfondità;
 	private JRadioButton rdbtnAmpiezza;
+	private JPanel panelNorth3;
+	private JLabel lblIterazioni;
+	private JTextField txtIterazioni;
+	private JLabel lblDescription;
 	
 	public DataIntegrationPanel() {
 		setLayout(new BorderLayout(0, 0));
@@ -61,16 +65,32 @@ public class DataIntegrationPanel extends JPanel {
 		txtUrl2.setColumns(70);
 		
 		panelNorth3 = new JPanel();
-		FlowLayout flowLayout_2 = (FlowLayout) panelNorth3.getLayout();
-		flowLayout_2.setAlignment(FlowLayout.LEFT);
+		FlowLayout fl_panelNorth3 = (FlowLayout) panelNorth3.getLayout();
+		fl_panelNorth3.setAlignment(FlowLayout.LEFT);
 		panelNorth.add(panelNorth3);
+		
+		lblIterazioni = new JLabel("Iterazioni:");
+		panelNorth3.add(lblIterazioni);
+		
+		txtIterazioni = new JTextField();
+		txtIterazioni.setText("100");
+		panelNorth3.add(txtIterazioni);
+		txtIterazioni.setColumns(10);
+		
+		lblDescription = new JLabel("(Inserire il numero di iterazioni dopo il quale arrestare la ricerca)");
+		panelNorth3.add(lblDescription);
+		
+		panelNorth4 = new JPanel();
+		FlowLayout fl_panelNorth4 = (FlowLayout) panelNorth4.getLayout();
+		fl_panelNorth4.setAlignment(FlowLayout.LEFT);
+		panelNorth.add(panelNorth4);
 		
 		rdbtnProfondità = new JRadioButton("Ricerca in profodità");
 		rdbtnProfondità.setSelected(true);
-		panelNorth3.add(rdbtnProfondità);
+		panelNorth4.add(rdbtnProfondità);
 		
 		rdbtnAmpiezza = new JRadioButton("Ricerca in ampiezza");
-		panelNorth3.add(rdbtnAmpiezza);
+		panelNorth4.add(rdbtnAmpiezza);
 		
 		ButtonGroup group = new ButtonGroup();
 	    group.add(rdbtnProfondità);
@@ -95,6 +115,10 @@ public class DataIntegrationPanel extends JPanel {
 		panelSouth.add(btnPulisci);
 	}
 	
+	public JTextField getTxtIterazioni() {
+		return txtIterazioni;
+	}
+
 	public JRadioButton getRdbtnProfondità() {
 		return rdbtnProfondità;
 	}
