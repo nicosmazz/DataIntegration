@@ -41,7 +41,9 @@ public class DataIntegrationController {
 	private Model modelSecondUri;
 	private DataIntegrationPanel view;
 	private ArrayList<RDFNode> matches = new ArrayList<RDFNode>();
-	private Instant start;
+	ArrayList<DbpediaObject> list = new ArrayList<DbpediaObject>();
+	ArrayList<DbpediaObject> list2 = new ArrayList<DbpediaObject>();
+	Instant start;
 	private Instant end;
 	private boolean monitorThread = true;
 	private PrintWriter writer;
@@ -106,9 +108,9 @@ public class DataIntegrationController {
 						String urlNotizia2 = view.getTxtUrl2().getText();
 						maxIteration = Integer.valueOf(view.getTxtIterazioni().getText());
 						// Lista di Uri dbpedia estratti dalla prima notizia
-						ArrayList<DbpediaObject> list = RestServices.getRequest(urlNotizia);
+						list = RestServices.getRequest(urlNotizia);
 						// Lista di Uri dbpedia estratti dalla seconda notizia
-						ArrayList<DbpediaObject> list2 = RestServices.getRequest(urlNotizia2);
+						list2 = RestServices.getRequest(urlNotizia2);
 						// elimino doppioni dalle liste
 						list = DbpediaObject.cleanArrayList(list);
 						list2 = DbpediaObject.cleanArrayList(list2);
@@ -121,14 +123,16 @@ public class DataIntegrationController {
 						// cerco tutte le triple che hanno come soggetto/oggetto i vari uri estratti
 						// dalla seconda notizia
 						modelSecondUri = SparqlQuery.QuerySparql(list2);
-						// faccio un check sui due modelli ottenuti al fine di constatare un'eventuale
-						// intersezione
+
+						// Stampo a schermo le keyword con i relativi uri DBPedia estratti dalle news
+						writeResult(true, false, false);
 
 						writer.println("Iterazione n° " + currentIteration + ":");
 						writer.println();
-
+						// faccio un check sui due modelli ottenuti al fine di constatare un'eventuale
+						// intersezione
 						boolean match = searchMatch();
-						writeResult(match, false);
+						writeResult(false, match, false);
 						if (view.getRdbtnProfondità().isSelected()) {
 							ricercaInProfondita();
 						} else {
@@ -136,15 +140,17 @@ public class DataIntegrationController {
 						}
 						dialog.dispose();
 						writer.close();
-						
+
 						JDialog dialog2 = new JDialog(frame, "Elaborazioe Terminata", true);
 						String message;
-						if(currentIteration == maxIteration) {
-							message = "La ricerca è terminata dopo " + currentIteration + " iterazioni, trovando " + matchFound + " match"; 
+						if (currentIteration == maxIteration) {
+							message = "La ricerca è terminata dopo " + currentIteration + " iterazioni, trovando "
+									+ matchFound + " match";
 						} else {
-							message = "L'algoritmo non ha potuto raggiungere il numero di iterazioni richieste" 
-									+"\n Si è fermato a " + currentIteration + " iterazioni trovando " + matchFound + " match";
- 						}
+							message = "L'algoritmo non ha potuto raggiungere il numero di iterazioni richieste"
+									+ "\n Si è fermato a " + currentIteration + " iterazioni trovando " + matchFound
+									+ " match";
+						}
 						FinishedElaborationPanel panelfinishedElaboration = new FinishedElaborationPanel(message);
 						dialog2.getContentPane().add(panelfinishedElaboration);
 						dialog2.pack();
@@ -153,7 +159,7 @@ public class DataIntegrationController {
 						dialog2.setMaximumSize(dialog2.getSize());
 						dialog2.setLocationRelativeTo(frame);
 						panelfinishedElaboration.getBtnOk().addActionListener(new ActionListener() {
-							
+
 							@Override
 							public void actionPerformed(ActionEvent e) {
 								dialog2.dispose();
@@ -326,9 +332,6 @@ public class DataIntegrationController {
 					 * utile per ricostruire il path dell'eventuale match trovato
 					 */
 					firstObject = node;
-					if (currentIteration == 320 || currentIteration == 324 || currentIteration == 327) {
-						System.out.println(firstObject);
-					}
 					Model newModel;
 					if (node.isLiteral()) {
 						newModel = SparqlQuery.QuerySparql(node.toString(), true);
@@ -343,7 +346,7 @@ public class DataIntegrationController {
 					 */
 					modelFirstUri = newModel;
 					match = searchMatch();
-					writeResult(match, false);
+					writeResult(false, match, false);
 					/*
 					 * A questo punto espando una sola volta gli object del modello creato sopra
 					 */
@@ -381,7 +384,7 @@ public class DataIntegrationController {
 								// quindi cerco di nuovi dei match
 								modelFirstUri = newModel2;
 								match = searchMatch();
-								writeResult(match, false);
+								writeResult(false, match, false);
 								/*
 								 * if (match) { // se trovo un match interrompo l'iterazione break; }
 								 */
@@ -407,7 +410,7 @@ public class DataIntegrationController {
 				break;
 			}
 		}
-		writeResult(false, true);
+		writeResult(false, false, true);
 	}
 
 	/* Inizio metodo nuovo */
@@ -471,7 +474,7 @@ public class DataIntegrationController {
 					expandedNodes.add(object1);
 
 					match = searchMatch();
-					writeResult(match, false);
+					writeResult(false, match, false);
 				}
 			} else {
 				break;
@@ -479,8 +482,8 @@ public class DataIntegrationController {
 		}
 
 		/*
-		 * se non ho superato il numero massimo di iterazioni proseguo espandendo una volta
-		 * ogni nodo contenuto nei modelli salvati all'interno della lista
+		 * se non ho superato il numero massimo di iterazioni proseguo espandendo una
+		 * volta ogni nodo contenuto nei modelli salvati all'interno della lista
 		 * expandedNodes. Quindi scendo in profondità nel mio grafo
 		 */
 		for (int i = 0; i < expandedNodes.size(); i++) {
@@ -519,7 +522,7 @@ public class DataIntegrationController {
 						// quindi cerco di nuovi dei match
 						modelFirstUri = newModel2;
 						match = searchMatch();
-						writeResult(match, false);
+						writeResult(false, match, false);
 					}
 				}
 				secondObject = null;
@@ -528,15 +531,43 @@ public class DataIntegrationController {
 			}
 
 		}
-		writeResult(false, false);
+		writeResult(false, false, false);
 	}
 
 	/*
 	 * Questo metodo mostra a schermo eventuali match trovati durante le varie
 	 * iterazioni dell'algoritmo di ricerca
 	 */
-	private void writeResult(boolean match, boolean finish) {
+	private void writeResult(boolean keyword, boolean match, boolean finish) {
+		if (keyword) {
+			ResultPanel resultPanel = new ResultPanel();
+			JTextArea txtArea = resultPanel.getTextArea();
+			txtArea.setFont(new Font("Lucida Grande", Font.BOLD, 14));
 
+			txtArea.append("Keyword/UriDbPedia estratti dalla prima notizia:");
+			txtArea.append(System.lineSeparator());
+			txtArea.append(System.lineSeparator());
+			int j = 0;
+			for (int i = 0; i < list.size(); i++) {
+				j = i + 1;
+				txtArea.append(j + ") " + list.get(i).getNome() + "/" + list.get(i).getUriDbpedia());
+				txtArea.append(System.lineSeparator());
+			}
+
+			txtArea.append(System.lineSeparator());
+			txtArea.append(System.lineSeparator());
+			txtArea.append("Keyword/UriDbPedia estratti dalla seconda notizia:");
+			txtArea.append(System.lineSeparator());
+			txtArea.append(System.lineSeparator());
+			j = 0;
+			for (int i = 0; i < list2.size(); i++) {
+				j = i + 1;
+				txtArea.append(j + ") " + list2.get(i).getNome() + "/" + list2.get(i).getUriDbpedia());
+				txtArea.append(System.lineSeparator());
+			}
+			view.getPanelBox().add(txtArea);
+			view.getPanelBox().revalidate();
+		}
 		if (match) {
 			ResultPanel resPanel = new ResultPanel();
 			JTextArea txtArea = resPanel.getTextArea();
@@ -604,7 +635,17 @@ public class DataIntegrationController {
 				selectSub = new SimpleSelector((Resource) null, (Property) null, (RDFNode) firstObject);
 				iter = modelFirstUriModified.listStatements(selectSub);
 				if (iter.hasNext()) {
-					stmt = iter.next();
+					Statement stmt2 = iter.next();
+					stmt = stmt2;
+					if (!DbpediaObject.contains(list, stmt2.getSubject().toString())) {
+						while (iter.hasNext()) {
+							stmt2 = iter.next();
+							if (DbpediaObject.contains(list, stmt2.getSubject().toString())) {
+								stmt = stmt2;
+								break;
+							}
+						}
+					}
 					// Con lo statament trovato creo una variabile di tipo path che utilizzero per
 					// stampare a video poi il percorso seguito
 					Path path = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),

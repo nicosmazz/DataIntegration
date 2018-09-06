@@ -48,5 +48,16 @@ public class DbpediaObject {
 		}
 		return cleanedArray;
 	}
+	
+	public static boolean contains(ArrayList<DbpediaObject> list, String Uri) {
+		boolean result = false;
+		for(int i=0; i<list.size(); i++) {
+			if(list.get(i).getUriDbpedia().toString().equals(Uri)) {
+				result = true;
+				break;
+			}
+		}
+		return result;
+	}
 
 }
