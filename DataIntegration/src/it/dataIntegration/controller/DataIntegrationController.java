@@ -36,6 +36,7 @@ import it.dataIntegration.view.PleaseWaitPanel;
 import it.dataIntegration.view.ResultPanel;
 
 public class DataIntegrationController {
+	private Model initalFirstModel;
 	private Model modelFirstUri;
 	private Model modelFirstUriModified;
 	private Model modelSecondUri;
@@ -119,6 +120,7 @@ public class DataIntegrationController {
 						// cerco tutte le triple che hanno come soggetto/oggetto i vari uri estratti
 						// dalla prima notizia
 						modelFirstUri = SparqlQuery.QuerySparql(list);
+						initalFirstModel = modelFirstUri;
 						modelFirstUriModified = modelFirstUri;
 						// cerco tutte le triple che hanno come soggetto/oggetto i vari uri estratti
 						// dalla seconda notizia
@@ -186,6 +188,7 @@ public class DataIntegrationController {
 				firstObject = null;
 				secondObject = null;
 				matches.clear();
+				matchFound = 0;
 				ProcessCpuLoad.clearArrayList();
 			}
 		});
@@ -498,7 +501,7 @@ public class DataIntegrationController {
 				}
 				for (int j = 0; j < resources2.size(); j++) {
 					RDFNode node2 = resources2.get(j);
-					if (!nodeAlreadyExpanded.contains(node2.toString())) {
+					if (!nodeAlreadyExpanded.contains(node2.toString()) && currentIteration < maxIteration) {
 						currentIteration++;
 						nodeAlreadyExpanded.add(node2.toString());
 						/*
@@ -523,6 +526,10 @@ public class DataIntegrationController {
 						modelFirstUri = newModel2;
 						match = searchMatch();
 						writeResult(false, match, false);
+					} else {
+						if(currentIteration >= maxIteration) {
+							break;
+						}
 					}
 				}
 				secondObject = null;
@@ -623,7 +630,7 @@ public class DataIntegrationController {
 		SimpleSelector selectSub1;
 		StmtIterator iter;
 		StmtIterator iter1;
-		Statement stmt;
+		Statement stmt = null;
 		Statement stmt1;
 		ArrayList<Path> paths = new ArrayList<Path>();
 
@@ -631,115 +638,124 @@ public class DataIntegrationController {
 		if (check) {
 			// trovato un match al primo livello di espansione
 			if (firstObject != null) {
-				// cerco lo statement relativo all'object espanso
-				selectSub = new SimpleSelector((Resource) null, (Property) null, (RDFNode) firstObject);
-				iter = modelFirstUriModified.listStatements(selectSub);
-				if (iter.hasNext()) {
-					Statement stmt2 = iter.next();
-					stmt = stmt2;
-					if (!DbpediaObject.contains(list, stmt2.getSubject().toString())) {
+				if (!DbpediaObject.contains(list, firstObject.toString())) {
+					boolean trovato = false;
+					// cerco lo statement relativo all'object espanso
+					selectSub = new SimpleSelector((Resource) null, (Property) null, (RDFNode) firstObject);
+					iter = initalFirstModel.listStatements(selectSub);
+					while (iter.hasNext()) {
+						stmt = iter.next();
+						if (DbpediaObject.contains(list, stmt.getSubject().toString())) {
+							trovato = true;
+							break;
+						}
+					}
+					if (!trovato) {
+						selectSub = new SimpleSelector((Resource) firstObject, (Property) null, (RDFNode) null);
+						iter = initalFirstModel.listStatements(selectSub);
 						while (iter.hasNext()) {
-							stmt2 = iter.next();
-							if (DbpediaObject.contains(list, stmt2.getSubject().toString())) {
-								stmt = stmt2;
+							stmt = iter.next();
+							if (DbpediaObject.contains(list, stmt.getObject().toString())) {
+								trovato = true;
 								break;
 							}
 						}
 					}
-					// Con lo statament trovato creo una variabile di tipo path che utilizzero per
-					// stampare a video poi il percorso seguito
-					Path path = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
-							stmt.getObject().toString());
-					paths.add(path);
-					// se secondObject != null vuol dire che dopo aver espanso un nodo, ho espanso
-					// anche un suo figlio
-					if (secondObject != null) {
-						// di conseguenza devo ricercare il predicato che lega i due nodi espansi
-						if (!firstObject.isLiteral()) {
-							selectSub = new SimpleSelector((Resource) firstObject, (Property) null,
-									(RDFNode) secondObject);
-							iter = modelFirstUriModified.listStatements(selectSub);
-						} else {
-							selectSub = null;
-							iter = null;
-						}
-						if (!secondObject.isLiteral()) {
-							selectSub1 = new SimpleSelector((Resource) secondObject, (Property) null,
-									(RDFNode) firstObject);
-							iter1 = modelFirstUriModified.listStatements(selectSub1);
-						} else {
-							selectSub1 = null;
-							iter1 = null;
-						}
-
-						if (selectSub != null && iter.hasNext()) {
-							stmt = iter.next();
-							Path path1 = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
-									stmt.getObject().toString());
-							paths.add(path1);
-						}
-						if (selectSub1 != null && iter1.hasNext()) {
-							stmt1 = iter1.next();
-							Path path2 = new Path(stmt1.getSubject().toString(), stmt1.getPredicate().toString(),
-									stmt1.getObject().toString());
-							paths.add(path2);
-						}
-						// a questo punto devo trovare lo statement dal secondo nodo espanso al match
-						// trovato
-						selectSub = new SimpleSelector((Resource) secondObject, (Property) null,
-								(RDFNode) matches.get(numeroMatch));
+					if(stmt != null) {
+						// Con lo statament trovato creo una variabile di tipo path che utilizzero per
+						// stampare a video poi il percorso seguito
+						Path path = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
+								stmt.getObject().toString());
+						paths.add(path);
+					}
+				}
+				// se secondObject != null vuol dire che dopo aver espanso un nodo, ho espanso
+				// anche un suo figlio
+				if (secondObject != null) {
+					// di conseguenza devo ricercare il predicato che lega i due nodi espansi
+					if (!firstObject.isLiteral()) {
+						selectSub = new SimpleSelector((Resource) firstObject, (Property) null, (RDFNode) secondObject);
 						iter = modelFirstUriModified.listStatements(selectSub);
-
-						if (!matches.get(numeroMatch).isLiteral()) {
-							selectSub1 = new SimpleSelector((Resource) matches.get(numeroMatch), (Property) null,
-									(RDFNode) secondObject);
-							iter1 = modelFirstUriModified.listStatements(selectSub1);
-						} else {
-							selectSub1 = null;
-						}
-
-						if (iter.hasNext()) {
-							stmt = iter.next();
-							Path path1 = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
-									stmt.getObject().toString());
-							paths.add(path1);
-						}
-						if (selectSub1 != null && iter1.hasNext()) {
-							stmt1 = iter1.next();
-							Path path2 = new Path(stmt1.getSubject().toString(), stmt1.getPredicate().toString(),
-									stmt1.getObject().toString());
-							paths.add(path2);
-						}
 					} else {
-						/*
-						 * Se sono qui vuol dire che non ho espanso alcun nodo figlio di un nodo già
-						 * espanso quindi devo trovare il predicato che lega il match trovato con il
-						 * nodo espanso
-						 */
+						selectSub = null;
+						iter = null;
+					}
+					if (!secondObject.isLiteral()) {
+						selectSub1 = new SimpleSelector((Resource) secondObject, (Property) null,
+								(RDFNode) firstObject);
+						iter1 = modelFirstUriModified.listStatements(selectSub1);
+					} else {
+						selectSub1 = null;
+						iter1 = null;
+					}
 
-						selectSub = new SimpleSelector((Resource) firstObject, (Property) null,
-								(RDFNode) matches.get(numeroMatch));
-						iter = modelFirstUriModified.listStatements(selectSub);
-						if (!matches.get(numeroMatch).isLiteral()) {
-							selectSub1 = new SimpleSelector((Resource) matches.get(numeroMatch), (Property) null,
-									(RDFNode) firstObject);
-							iter1 = modelFirstUriModified.listStatements(selectSub1);
-						} else {
-							selectSub1 = null;
-							iter1 = null;
-						}
-						if (iter.hasNext()) {
-							stmt = iter.next();
-							Path path1 = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
-									stmt.getObject().toString());
-							paths.add(path1);
-						}
-						if (selectSub1 != null && iter1.hasNext()) {
-							stmt1 = iter1.next();
-							Path path2 = new Path(stmt1.getSubject().toString(), stmt1.getPredicate().toString(),
-									stmt1.getObject().toString());
-							paths.add(path2);
-						}
+					if (selectSub != null && iter.hasNext()) {
+						stmt = iter.next();
+						Path path1 = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
+								stmt.getObject().toString());
+						paths.add(path1);
+					}
+					if (selectSub1 != null && iter1.hasNext()) {
+						stmt1 = iter1.next();
+						Path path2 = new Path(stmt1.getSubject().toString(), stmt1.getPredicate().toString(),
+								stmt1.getObject().toString());
+						paths.add(path2);
+					}
+					// a questo punto devo trovare lo statement dal secondo nodo espanso al match
+					// trovato
+					selectSub = new SimpleSelector((Resource) secondObject, (Property) null,
+							(RDFNode) matches.get(numeroMatch));
+					iter = modelFirstUriModified.listStatements(selectSub);
+
+					if (!matches.get(numeroMatch).isLiteral()) {
+						selectSub1 = new SimpleSelector((Resource) matches.get(numeroMatch), (Property) null,
+								(RDFNode) secondObject);
+						iter1 = modelFirstUriModified.listStatements(selectSub1);
+					} else {
+						selectSub1 = null;
+					}
+
+					if (iter.hasNext()) {
+						stmt = iter.next();
+						Path path1 = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
+								stmt.getObject().toString());
+						paths.add(path1);
+					}
+					if (selectSub1 != null && iter1.hasNext()) {
+						stmt1 = iter1.next();
+						Path path2 = new Path(stmt1.getSubject().toString(), stmt1.getPredicate().toString(),
+								stmt1.getObject().toString());
+						paths.add(path2);
+					}
+				} else {
+					/*
+					 * Se sono qui vuol dire che non ho espanso alcun nodo figlio di un nodo già
+					 * espanso quindi devo trovare il predicato che lega il match trovato con il
+					 * nodo espanso
+					 */
+
+					selectSub = new SimpleSelector((Resource) firstObject, (Property) null,
+							(RDFNode) matches.get(numeroMatch));
+					iter = modelFirstUriModified.listStatements(selectSub);
+					if (!matches.get(numeroMatch).isLiteral()) {
+						selectSub1 = new SimpleSelector((Resource) matches.get(numeroMatch), (Property) null,
+								(RDFNode) firstObject);
+						iter1 = modelFirstUriModified.listStatements(selectSub1);
+					} else {
+						selectSub1 = null;
+						iter1 = null;
+					}
+					if (iter.hasNext()) {
+						stmt = iter.next();
+						Path path1 = new Path(stmt.getSubject().toString(), stmt.getPredicate().toString(),
+								stmt.getObject().toString());
+						paths.add(path1);
+					}
+					if (selectSub1 != null && iter1.hasNext()) {
+						stmt1 = iter1.next();
+						Path path2 = new Path(stmt1.getSubject().toString(), stmt1.getPredicate().toString(),
+								stmt1.getObject().toString());
+						paths.add(path2);
 					}
 				}
 			} else {
